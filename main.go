@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"github.com/go-redis/redis"
 )
 
 // DB contains information for current db connection
@@ -30,6 +31,11 @@ type DB struct {
 	singularTable bool
 }
 
+//redis open
+func RedisOpen(opt *redis.Options) *redis.Client{
+	Rds =  redis.NewClient(opt)
+	return Rds
+}
 // Open initialize a new db connection, need to import driver first, e.g:
 //
 //     import _ "github.com/go-sql-driver/mysql"

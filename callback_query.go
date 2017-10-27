@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"crypto/md5"
+	"encoding/json"
 )
 
 // Define callbacks for querying
@@ -55,6 +57,17 @@ func queryCallback(scope *Scope) {
 			scope.SQL += addExtraSpaceIfExist(fmt.Sprint(str))
 		}
 
+		//get hasevalue from sql
+		haskey := md5.Sum([]byte(scope.SQL))
+		haskeystr := fmt.Sprintf("%x", haskey) //将[]byte转成16进制
+		//is value exist?
+		if(Rds.HExists(scope.TableName(),haskeystr).Val()){
+			//get values from redis
+			redisValue, _ := Rds.HGet(scope.TableName(),haskeystr).Bytes()
+			json.Unmarshal(redisValue,scope.Value)
+			return
+		}
+
 		if rows, err := scope.SQLDB().Query(scope.SQL, scope.SQLVars...); scope.Err(err) == nil {
 			defer rows.Close()
 
@@ -77,7 +90,9 @@ func queryCallback(scope *Scope) {
 					}
 				}
 			}
-
+			//set redis value
+			jsonValue, _ := json.Marshal(scope.Value)
+			Rds.HSet(scope.TableName(),haskeystr,jsonValue)
 			if err := rows.Err(); err != nil {
 				scope.Err(err)
 			} else if scope.db.RowsAffected == 0 && !isSlice {
@@ -90,6 +105,8 @@ func queryCallback(scope *Scope) {
 // afterQueryCallback will invoke `AfterFind` method after querying
 func afterQueryCallback(scope *Scope) {
 	if !scope.HasError() {
+		//jsonValue, _ := json.Marshal(scope.Value)
+		//println(jsonValue)
 		scope.CallMethod("AfterFind")
 	}
 }
