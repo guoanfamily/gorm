@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"reflect"
 )
 
 // Define callbacks for updating
@@ -85,6 +86,12 @@ func updateCallback(scope *Scope) {
 		}
 
 		if len(sqls) > 0 {
+			//add redis logic: remove table values stored in redis
+			iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
+			if (iscache.IsValid() && iscache.Bool()) {
+				Rds.Del(scope.TableName())
+			}
+
 			scope.Raw(fmt.Sprintf(
 				"UPDATE %v SET %v%v%v",
 				scope.QuotedTableName(),

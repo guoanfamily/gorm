@@ -3,6 +3,7 @@ package gorm
 import (
 	"fmt"
 	"strings"
+	"reflect"
 )
 
 // Define callbacks for creating
@@ -115,6 +116,11 @@ func createCallback(scope *Scope) {
 
 		// execute create sql
 		if lastInsertIDReturningSuffix == "" || primaryField == nil {
+			//add redis logic: remove table values stored in redis
+			iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
+			if (iscache.IsValid() && iscache.Bool()) {
+				Rds.Del(scope.TableName())
+			}
 			if result, err := scope.SQLDB().Exec(scope.SQL, scope.SQLVars...); scope.Err(err) == nil {
 				// set rows affected count
 				scope.db.RowsAffected, _ = result.RowsAffected()

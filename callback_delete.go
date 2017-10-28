@@ -3,6 +3,7 @@ package gorm
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 // Define callbacks for deleting
@@ -34,6 +35,12 @@ func deleteCallback(scope *Scope) {
 		}
 
 		deletedAtField, hasDeletedAtField := scope.FieldByName("DeletedAt")
+
+		//add redis logic: remove table values stored in redis
+		iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
+		if (iscache.IsValid() && iscache.Bool()) {
+			Rds.Del(scope.TableName())
+		}
 
 		if !scope.Search.Unscoped && hasDeletedAtField {
 			scope.Raw(fmt.Sprintf(
