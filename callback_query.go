@@ -61,8 +61,9 @@ func queryCallback(scope *Scope) {
 		if str, ok := scope.Get("gorm:query_option"); ok {
 			scope.SQL += addExtraSpaceIfExist(fmt.Sprint(str))
 		}
+		sqlvarsstr:= fmt.Sprint(scope.SQLVars)
 		iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
-		haskey := md5.Sum([]byte(scope.SQL))
+		haskey := md5.Sum([]byte(scope.SQL+ sqlvarsstr))
 		haskeystr := fmt.Sprintf("%x", haskey) //将[]byte转成16进制
 		//iscache存在且其值为真，则调用redis缓存逻辑
 		if (iscache.IsValid() && iscache.Bool()) {
