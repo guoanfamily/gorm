@@ -87,8 +87,8 @@ func updateCallback(scope *Scope) {
 
 		if len(sqls) > 0 {
 			//add redis logic: remove table values stored in redis
-			iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
-			if (iscache.IsValid() && iscache.Bool()) {
+			iscache :=strings.Contains(scope.SQL,"true=true")
+			if (iscache) {
 				Rds.Del(scope.TableName())
 			}
 

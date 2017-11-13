@@ -37,8 +37,8 @@ func deleteCallback(scope *Scope) {
 		deletedAtField, hasDeletedAtField := scope.FieldByName("DeletedAt")
 
 		//add redis logic: remove table values stored in redis
-		iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
-		if (iscache.IsValid() && iscache.Bool()) {
+		iscache :=strings.Contains(scope.SQL,"true=true")
+		if (iscache) {
 			Rds.Del(scope.TableName())
 		}
 
