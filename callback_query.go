@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"crypto/md5"
 	"encoding/json"
+	"strings"
 )
 
 // Define callbacks for querying
@@ -62,11 +63,11 @@ func queryCallback(scope *Scope) {
 			scope.SQL += addExtraSpaceIfExist(fmt.Sprint(str))
 		}
 		sqlvarsstr:= fmt.Sprint(scope.SQLVars)
-		iscache := reflect.ValueOf(scope.Value).Elem().FieldByName("isCache")
+		iscache :=strings.Contains(scope.SQL,"true=true")
 		haskey := md5.Sum([]byte(scope.SQL+ sqlvarsstr))
 		haskeystr := fmt.Sprintf("%x", haskey) //将[]byte转成16进制
 		//iscache存在且其值为真，则调用redis缓存逻辑
-		if (iscache.IsValid() && iscache.Bool()) {
+		if (iscache) {
 			//is value exist?
 			if (Rds.HExists(scope.TableName(), haskeystr).Val()) {
 				//get values from redis
@@ -78,7 +79,7 @@ func queryCallback(scope *Scope) {
 
 		if rows, err := scope.SQLDB().Query(scope.SQL, scope.SQLVars...); scope.Err(err) == nil {
 			defer rows.Close()
-
+			fmt.Println("queryend")
 			columns, _ := rows.Columns()
 			for rows.Next() {
 				scope.db.RowsAffected++
@@ -98,7 +99,7 @@ func queryCallback(scope *Scope) {
 					}
 				}
 			}
-			if (iscache.IsValid() && iscache.Bool()) {
+			if (iscache) {
 				//set redis value
 				jsonValue, _ := json.Marshal(scope.Value)
 				Rds.HSet(scope.TableName(), haskeystr, jsonValue)
