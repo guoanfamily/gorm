@@ -3,7 +3,7 @@ package gorm
 import (
 	"errors"
 	"fmt"
-	"reflect"
+	"strings"
 )
 
 // Define callbacks for deleting

@@ -3,7 +3,6 @@ package gorm
 import (
 	"fmt"
 	"strings"
-	"reflect"
 )
 
 // Define callbacks for creating
