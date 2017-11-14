@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 	"github.com/go-redis/redis"
+	"crypto/md5"
+	"regexp"
+	"encoding/json"
 )
 
 // DB contains information for current db connection
@@ -301,7 +304,31 @@ func (s *DB) Find(out interface{}, where ...interface{}) *DB {
 
 // Scan scan value to a struct
 func (s *DB) Scan(dest interface{}) *DB {
-	return s.clone().NewScope(s.Value).Set("gorm:query_destination", dest).callCallbacks(s.parent.callbacks.queries).db
+	db := s.clone().NewScope(s.Value).Set("gorm:query_destination", dest).callCallbacks(s.parent.callbacks.queries).db
+	var firstTableName string
+	sqlvarsstr:= fmt.Sprint(*db.QueryExpr())
+	iscache :=strings.Contains(sqlvarsstr,"true=true")
+	haskey := md5.Sum([]byte(sqlvarsstr))
+	haskeystr := fmt.Sprintf("%x", haskey) //将[]byte转成16进制
+	fmt.Println("main:",haskeystr)
+	reg := regexp.MustCompile("(?i)\\s+(from|join)\\s+`*(\\w+)`*\\s+")
+	tableNames := reg.FindAllStringSubmatch(sqlvarsstr,-1)
+	if len(tableNames)>0 {
+		firstTableName = tableNames[0][2]
+	}
+	if (iscache && len(firstTableName)>0) {
+		if (Rds.HExists(firstTableName, haskeystr).Val()) {
+			//get values from redis
+			redisValue, _ := Rds.HGet(firstTableName, haskeystr).Bytes()
+			fmt.Println(redisValue,haskeystr)
+			json.Unmarshal(redisValue, dest)
+		}else{
+			//set redis value
+			jsonValue, _ := json.Marshal(dest)
+			Rds.HSet(firstTableName, haskeystr, jsonValue)
+		}
+	}
+	return db
 }
 
 // Row return `*sql.Row` with given conditions

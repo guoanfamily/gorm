@@ -7,6 +7,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"strings"
+	"regexp"
 )
 
 // Define callbacks for querying
@@ -62,18 +63,37 @@ func queryCallback(scope *Scope) {
 		if str, ok := scope.Get("gorm:query_option"); ok {
 			scope.SQL += addExtraSpaceIfExist(fmt.Sprint(str))
 		}
-		sqlvarsstr:= fmt.Sprint(scope.SQLVars)
+		var sqlvarsstr string
+
+		if(scope.TableName()==""){
+			sqlvarsstr = fmt.Sprint(*scope.db.QueryExpr())
+		}else{
+			vars := fmt.Sprint(scope.SQLVars)
+			sqlvarsstr = scope.SQL+vars
+
+		}
+		fmt.Println(sqlvarsstr)
 		iscache :=strings.Contains(scope.SQL,"true=true")
-		haskey := md5.Sum([]byte(scope.SQL+ sqlvarsstr))
+		haskey := md5.Sum([]byte(sqlvarsstr))
 		haskeystr := fmt.Sprintf("%x", haskey) //将[]byte转成16进制
+		fmt.Println("query:",haskeystr)
 		//iscache存在且其值为真，则调用redis缓存逻辑
+		var firstTableName string
 		if (iscache) {
-			//is value exist?
-			if (Rds.HExists(scope.TableName(), haskeystr).Val()) {
-				//get values from redis
-				redisValue, _ := Rds.HGet(scope.TableName(), haskeystr).Bytes()
-				json.Unmarshal(redisValue, scope.Value)
-				return
+			//get tables name
+
+			reg := regexp.MustCompile("(?i)\\s+(from|join)\\s+`*(\\w+)`*\\s+")
+			tableNames := reg.FindAllStringSubmatch(scope.SQL,-1)
+			if len(tableNames)>0 {
+				firstTableName = tableNames[0][2]
+			//is value exist?			/
+				if (Rds.HExists(firstTableName, haskeystr).Val()) {
+					//get values from redis
+					redisValue, _ := Rds.HGet(firstTableName, haskeystr).Bytes()
+					fmt.Println(redisValue,haskeystr)
+					json.Unmarshal(redisValue, scope.Value)
+					return
+				}
 			}
 		}
 
@@ -99,10 +119,10 @@ func queryCallback(scope *Scope) {
 					}
 				}
 			}
-			if (iscache) {
+			if (iscache && len(firstTableName)>0 && scope.Value!=nil) {
 				//set redis value
 				jsonValue, _ := json.Marshal(scope.Value)
-				Rds.HSet(scope.TableName(), haskeystr, jsonValue)
+				Rds.HSet(firstTableName, haskeystr, jsonValue)
 				if err := rows.Err(); err != nil {
 					scope.Err(err)
 				} else if scope.db.RowsAffected == 0 && !isSlice {
